@@ -21,10 +21,12 @@ export function getFirestore(): Firestore {
 
 /**
  * 儲存活動排程
+ * 使用 groupId 作為文件 ID，每個群組只保留一份最新排程
  */
 export async function saveSchedule(schedule: Schedule): Promise<string> {
     const db = getFirestore();
-    const docRef = db.collection('schedules').doc();
+    // 使用 groupId 作為文件 ID，新排程會覆蓋舊排程
+    const docRef = db.collection('schedules').doc(schedule.groupId);
 
     const data = {
         ...schedule,
@@ -42,22 +44,19 @@ export async function saveSchedule(schedule: Schedule): Promise<string> {
 
 /**
  * 取得群組的最新活動排程
+ * 使用固定文件 ID (groupId) 避免需要複合索引
  */
 export async function getLatestSchedule(groupId: string): Promise<Schedule | null> {
     const db = getFirestore();
-    const snapshot = await db
-        .collection('schedules')
-        .where('groupId', '==', groupId)
-        .orderBy('createdAt', 'desc')
-        .limit(1)
-        .get();
 
-    if (snapshot.empty) {
+    // 使用固定文件 ID 直接取得，避免需要索引
+    const doc = await db.collection('schedules').doc(groupId).get();
+
+    if (!doc.exists) {
         return null;
     }
 
-    const doc = snapshot.docs[0];
-    return convertScheduleFromFirestore(doc.id, doc.data());
+    return convertScheduleFromFirestore(doc.id, doc.data()!);
 }
 
 /**
