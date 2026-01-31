@@ -165,14 +165,35 @@ export function parseCommand(message: string): ParsedCommand | null {
         'test': '測試提醒',
     };
 
-    const commandType = commandMap[parts[0]];
+    let commandType = commandMap[parts[0]];
+    let args = parts.slice(1);
+
+    // 如果直接匹配失敗，嘗試檢查是否為「指令+參數」黏在一起的情況 (e.g. "綁定user1")
+    if (!commandType) {
+        const potentialCommand = parts[0];
+        // 依照長度排序，優先匹配較長的指令（雖目前無重疊指令，但屬好習慣）
+        const knownCommands = Object.keys(commandMap).sort((a, b) => b.length - a.length);
+
+        for (const cmd of knownCommands) {
+            if (potentialCommand.startsWith(cmd)) {
+                commandType = commandMap[cmd];
+                // 剩下的部分作為第一個參數
+                const firstArg = potentialCommand.slice(cmd.length);
+                if (firstArg) {
+                    args = [firstArg, ...args];
+                }
+                break;
+            }
+        }
+    }
+
     if (!commandType) {
         return null;
     }
 
     return {
         type: commandType,
-        args: parts.slice(1),
+        args: args,
         rawText: message,
     };
 }

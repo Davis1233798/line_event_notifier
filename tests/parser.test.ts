@@ -43,6 +43,24 @@ describe('Command Parser', () => {
         });
     });
 
+    it('should parse bind command without space', () => {
+        const result = parseCommand('!綁定user1');
+        expect(result).toEqual({
+            type: '綁定',
+            args: ['user1'],
+            rawText: '!綁定user1'
+        });
+    });
+
+    it('should parse bind command with fullwidth exclamation and no space', () => {
+        const result = parseCommand('！綁定user1');
+        expect(result).toEqual({
+            type: '綁定',
+            args: ['user1'],
+            rawText: '！綁定user1'
+        });
+    });
+
     it('should parse test reminder command', () => {
         const result = parseCommand('!測試提醒');
         expect(result).toEqual({
