@@ -361,6 +361,16 @@ export async function handleProductionDateTest(
             `${reminderText}`;
 
         await replyMessage(replyToken, createTextMessage(testMessage));
+
+        // 發送私訊給有綁定的志工（與正式運作一樣）
+        if (bindings.size > 0) {
+            const eventsForPrivate = events.map(e => ({
+                date: e.date,
+                type: e.type,
+                volunteers: e.volunteers,
+            }));
+            await sendPrivateRemindersToVolunteers(eventsForPrivate, bindings);
+        }
     } catch (error) {
         console.error('Error in production date test:', error);
         await replyMessage(replyToken, createTextMessage(
