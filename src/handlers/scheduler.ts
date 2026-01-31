@@ -102,9 +102,81 @@ async function sendReminderToGroup(
 
     const reminderText = formatReminderMessage(eventsWithNames);
 
-    // 發送訊息
+    // 發送群組訊息
     await pushMessage(groupId, createTextMessage(reminderText));
     console.log(`Reminder sent to group ${groupId}`);
+
+    // 發送私訊給每個有綁定的志工
+    await sendPrivateRemindersToVolunteers(events, bindings);
+}
+
+/**
+ * 發送私訊給每個有排班的志工
+ */
+async function sendPrivateRemindersToVolunteers(
+    events: Array<{ date: Date; type: string; volunteers: string[] }>,
+    bindings: Map<string, { displayName: string; userId: string; userName: string }>
+): Promise<void> {
+    // 建立每個志工的排班列表
+    const volunteerSchedules = new Map<string, Array<{ date: Date; type: string }>>();
+
+    for (const event of events) {
+        for (const volunteer of event.volunteers) {
+            const binding = bindings.get(volunteer);
+            if (binding) {
+                const userId = binding.userId;
+                if (!volunteerSchedules.has(userId)) {
+                    volunteerSchedules.set(userId, []);
+                }
+                volunteerSchedules.get(userId)!.push({
+                    date: event.date,
+                    type: event.type,
+                });
+            }
+        }
+    }
+
+    // 發送私訊給每個志工
+    for (const [userId, schedules] of volunteerSchedules) {
+        try {
+            const message = formatPrivateReminderMessage(schedules);
+            await pushMessage(userId, createTextMessage(message));
+            console.log(`Private reminder sent to user ${userId}`);
+        } catch (error) {
+            // 使用者可能沒有加機器人為好友，忽略錯誤
+            console.log(`Failed to send private message to ${userId}: ${error}`);
+        }
+    }
+}
+
+/**
+ * 格式化私訊提醒訊息
+ */
+function formatPrivateReminderMessage(
+    schedules: Array<{ date: Date; type: string }>
+): string {
+    const lines = ['📢 提醒您下週有排班：', ''];
+
+    for (const schedule of schedules) {
+        const dateStr = formatDateForPrivateMessage(schedule.date);
+        lines.push(`🔸 ${dateStr} ${schedule.type}`);
+    }
+
+    lines.push('');
+    lines.push('請記得出席！🙏');
+
+    return lines.join('\n');
+}
+
+/**
+ * 格式化日期用於私訊
+ */
+function formatDateForPrivateMessage(date: Date): string {
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
+    const dayOfWeek = dayNames[date.getDay()];
+    return `${month}/${day}(${dayOfWeek})`;
 }
 
 /**
