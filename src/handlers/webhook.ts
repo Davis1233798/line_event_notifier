@@ -52,8 +52,12 @@ export async function handleWebhookEvent(event: WebhookEvent): Promise<void> {
     const userId = event.source.userId;
     const message = event.message.text;
 
-    // 更新群組活動時間
-    await saveGroupInfo(groupId);
+    // 更新群組活動時間（非關鍵，錯誤不阻斷流程）
+    try {
+        await saveGroupInfo(groupId);
+    } catch (error) {
+        console.error('Error saving group info:', error);
+    }
 
     // 檢查是否為指令
     const command = parseCommand(message);
