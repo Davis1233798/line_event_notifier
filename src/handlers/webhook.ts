@@ -1,6 +1,7 @@
 import { WebhookEvent, TextEventMessage } from '@line/bot-sdk';
 import {
     replyMessage,
+    pushMessage,
     createTextMessage,
     isBotMentioned,
     getGroupId,
@@ -201,11 +202,23 @@ async function handleBindCommand(
         // 儲存綁定
         await bindUser(groupId, displayName, userId, userName, userId);
 
+        // 發送測試私訊驗證功能
+        let privateMessageStatus = '';
+        try {
+            await pushMessage(userId, createTextMessage(
+                `🎉 綁定測試成功！\n\n` +
+                `您已成功綁定為「${displayName}」\n` +
+                `之後有活動提醒時，我會私訊通知您。`
+            ));
+            privateMessageStatus = '\n\n✅ 已發送測試私訊給您';
+            console.log(`Test private message sent to ${userId}`);
+        } catch (pmError) {
+            privateMessageStatus = '\n\n⚠️ 無法發送私訊，請確認已加我為好友';
+            console.log(`Failed to send test private message to ${userId}:`, pmError);
+        }
+
         await replyMessage(replyToken, createTextMessage(
-            `✅ 綁定成功！\n\n` +
-            `📝 名稱：${displayName}\n` +
-            `👤 LINE 帳號：${userName}\n\n` +
-            `之後活動提醒會顯示您的 LINE 名稱`
+            `✅ ${userName} 已綁定為「${displayName}」${privateMessageStatus}`
         ));
     } catch (error) {
         console.error('Error binding user:', error);
