@@ -181,6 +181,7 @@ function formatDateForPrivateMessage(date: Date): string {
 
 /**
  * 處理測試提醒（用於 !測試提醒 指令）
+ * 測試模式：顯示排程中所有未過期的活動，並發送私訊給志工
  */
 export async function handleTestReminder(
     replyToken: string,
@@ -198,19 +199,21 @@ export async function handleTestReminder(
             return;
         }
 
-        // 取得下週日期範圍
-        const { start, end } = getNextWeekRange();
+        // 取得今天的日期（去除時間）
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
 
-        // 取得該時間範圍的活動
+        // 取得所有未過期的活動
         const events = schedule.events.filter(event => {
-            const eventTime = event.date.getTime();
-            return eventTime >= start.getTime() && eventTime <= end.getTime();
+            const eventDate = new Date(event.date);
+            eventDate.setHours(0, 0, 0, 0);
+            return eventDate >= today;
         });
 
         if (events.length === 0) {
             await replyMessage(replyToken, createTextMessage(
-                '📅 下週沒有安排活動\n\n' +
-                `查詢範圍：${formatDateRange(start, end)}`
+                '📅 沒有即將到來的活動\n' +
+                '所有活動都已過期，請更新排程'
             ));
             return;
         }
@@ -241,21 +244,23 @@ export async function handleTestReminder(
         const reminderText = formatReminderMessage(eventsWithNames);
 
         // 加上測試標記
-        const testMessage = `🧪 【測試提醒】\n\n${reminderText}\n\n---\n查詢範圍：${formatDateRange(start, end)}`;
+        const testMessage = `🧪 【測試提醒】\n\n${reminderText}\n\n---\n共 ${events.length} 場活動`;
 
         await replyMessage(replyToken, createTextMessage(testMessage));
 
         // 測試時也發送私訊給有綁定的志工
-        const eventsForPrivate = events.map(e => ({
-            date: e.date,
-            type: e.type,
-            volunteers: e.volunteers,
-        }));
-        await sendPrivateRemindersToVolunteers(eventsForPrivate, bindings);
+        if (bindings.size > 0) {
+            const eventsForPrivate = events.map(e => ({
+                date: e.date,
+                type: e.type,
+                volunteers: e.volunteers,
+            }));
+            await sendPrivateRemindersToVolunteers(eventsForPrivate, bindings);
+        }
     } catch (error) {
         console.error('Error in test reminder:', error);
         await replyMessage(replyToken, createTextMessage(
-            '❌ 測試提醒失敗，請稍後再試'
+            '❌ 測試提醒失敗\n錯誤：' + String(error)
         ));
     }
 }
