@@ -244,6 +244,14 @@ export async function handleTestReminder(
         const testMessage = `🧪 【測試提醒】\n\n${reminderText}\n\n---\n查詢範圍：${formatDateRange(start, end)}`;
 
         await replyMessage(replyToken, createTextMessage(testMessage));
+
+        // 測試時也發送私訊給有綁定的志工
+        const eventsForPrivate = events.map(e => ({
+            date: e.date,
+            type: e.type,
+            volunteers: e.volunteers,
+        }));
+        await sendPrivateRemindersToVolunteers(eventsForPrivate, bindings);
     } catch (error) {
         console.error('Error in test reminder:', error);
         await replyMessage(replyToken, createTextMessage(
