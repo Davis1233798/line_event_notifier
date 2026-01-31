@@ -62,21 +62,27 @@ export async function handleWebhookEvent(event: WebhookEvent): Promise<void> {
     // 檢查是否為指令
     const command = parseCommand(message);
     if (command) {
+        console.log(`Command detected: ${command.type} ${command.args.join(' ')}`);
         await handleCommand(event.replyToken, groupId, userId!, command);
         return;
+    } else {
+        console.log(`Message received but not a command: "${message}"`);
     }
 
     // 檢查是否被 mention 且包含活動排程
-    if (isBotMentioned(event) && isScheduleMessage(message)) {
-        await handleScheduleMessage(event.replyToken, groupId, userId!, message);
-        return;
+    if (isBotMentioned(event)) {
+        console.log(`Bot mentioned in message: "${message}"`);
+        if (isScheduleMessage(message)) {
+            console.log('Schedule message detected');
+            await handleScheduleMessage(event.replyToken, groupId, userId!, message);
+            return;
+        } else {
+            console.log('Not a schedule message, showing help');
+            await showHelp(event.replyToken);
+            return;
+        }
     }
 
-    // 如果被 mention 但不是活動排程，顯示幫助
-    if (isBotMentioned(event)) {
-        await showHelp(event.replyToken);
-        return;
-    }
 }
 
 /**
