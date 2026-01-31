@@ -233,6 +233,7 @@ export async function getAllBindings(groupId: string): Promise<UserBinding[]> {
 
 /**
  * 批次取得多個 displayName 的綁定
+ * 使用直接 doc 取得避免索引問題
  */
 export async function getBindingsForNames(
     groupId: string,
@@ -241,29 +242,37 @@ export async function getBindingsForNames(
     const db = getFirestore();
     const result = new Map<string, UserBinding>();
 
-    // Firestore 的 in 查詢最多支援 30 個值
-    const chunks = chunkArray(displayNames, 30);
+    console.log(`Looking for bindings: ${displayNames.join(', ')} in group ${groupId}`);
 
-    for (const chunk of chunks) {
-        const snapshot = await db
-            .collection('groups')
-            .doc(groupId)
-            .collection('userBindings')
-            .where('displayName', 'in', chunk)
-            .get();
+    // 直接用 doc ID 取得每個綁定
+    for (const displayName of displayNames) {
+        try {
+            const doc = await db
+                .collection('groups')
+                .doc(groupId)
+                .collection('userBindings')
+                .doc(displayName)
+                .get();
 
-        for (const doc of snapshot.docs) {
-            const data = doc.data();
-            result.set(data.displayName, {
-                displayName: data.displayName,
-                userId: data.userId,
-                userName: data.userName,
-                boundAt: data.boundAt.toDate(),
-                boundBy: data.boundBy,
-            });
+            if (doc.exists) {
+                const data = doc.data()!;
+                result.set(displayName, {
+                    displayName: data.displayName,
+                    userId: data.userId,
+                    userName: data.userName,
+                    boundAt: data.boundAt.toDate(),
+                    boundBy: data.boundBy,
+                });
+                console.log(`Found binding for ${displayName}: userId=${data.userId}`);
+            } else {
+                console.log(`No binding found for ${displayName}`);
+            }
+        } catch (error) {
+            console.error(`Error getting binding for ${displayName}:`, error);
         }
     }
 
+    console.log(`Total bindings found: ${result.size}`);
     return result;
 }
 
