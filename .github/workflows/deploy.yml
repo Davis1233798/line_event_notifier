@@ -5,11 +5,6 @@ on:
     branches:
       - main
 
-env:
-  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-  SERVICE_NAME: line-notifier
-  REGION: asia-east1
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -45,22 +40,24 @@ jobs:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
 
       - name: Configure Docker
-        run: gcloud auth configure-docker
+        run: gcloud auth configure-docker --quiet
 
-      - name: Build and Push Docker image
-        run: |
-          docker build -t gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }} .
-          docker push gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
+      - name: Build Docker image
+        run: docker build -t "gcr.io/${{ secrets.GCP_PROJECT_ID }}/line-notifier:${{ github.sha }}" .
+
+      - name: Push Docker image
+        run: docker push "gcr.io/${{ secrets.GCP_PROJECT_ID }}/line-notifier:${{ github.sha }}"
 
       - name: Deploy to Cloud Run
         run: |
-          gcloud run deploy ${{ env.SERVICE_NAME }} \
-            --image gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
+          gcloud run deploy line-notifier \
+            --image "gcr.io/${{ secrets.GCP_PROJECT_ID }}/line-notifier:${{ github.sha }}" \
             --platform managed \
-            --region ${{ env.REGION }} \
+            --region asia-east1 \
             --allow-unauthenticated \
             --set-env-vars "LINE_CHANNEL_ACCESS_TOKEN=${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }},LINE_CHANNEL_SECRET=${{ secrets.LINE_CHANNEL_SECRET }},GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }}"
 
       - name: Show deployed URL
         run: |
-          echo "Deployed to: $(gcloud run services describe ${{ env.SERVICE_NAME }} --region ${{ env.REGION }} --format='value(status.url)')"
+          echo "Deployed to: $(gcloud run services describe line-notifier --region asia-east1 --format='value(status.url)')"
+
