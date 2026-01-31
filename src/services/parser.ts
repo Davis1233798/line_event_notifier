@@ -1,9 +1,13 @@
 import dayjs from 'dayjs';
 import customParseFormat from 'dayjs/plugin/customParseFormat.js';
+import timezone from 'dayjs/plugin/timezone.js';
+import utc from 'dayjs/plugin/utc.js';
 import 'dayjs/locale/zh-tw.js';
 import type { ScheduleEvent, Schedule, ParsedCommand, CommandType } from '../types/index.js';
 
 dayjs.extend(customParseFormat);
+dayjs.extend(utc);
+dayjs.extend(timezone);
 dayjs.locale('zh-tw');
 
 /**
@@ -163,6 +167,7 @@ export function parseCommand(message: string): ParsedCommand | null {
         'help': '幫助',
         '測試提醒': '測試提醒',
         'test': '測試提醒',
+        '正式日期測試': '正式日期測試',
     };
 
     let commandType = commandMap[parts[0]];
@@ -231,17 +236,23 @@ export function filterEventsByDateRange(
 }
 
 /**
- * 取得下週的日期範圍（週日到週六）
+ * 取得提醒的日期範圍（今天到下週六）
+ * 使用 UTC+8 時區
+ * 例如：如果今天是 1/31（周六），則返回 1/31-2/06
  */
 export function getNextWeekRange(): { start: Date; end: Date } {
-    const now = dayjs();
-    // 下週日
-    const nextSunday = now.add(1, 'week').startOf('week');
-    // 下週六
-    const nextSaturday = nextSunday.add(6, 'day').endOf('day');
+    const now = dayjs().tz('Asia/Taipei');
+
+    // 今天凌晨
+    const today = now.startOf('day');
+
+    // 計算下週六（從今天開始往後數）
+    // 週六是 dayjs 的 6
+    const daysUntilNextSaturday = (6 - today.day() + 7) % 7 || 7;
+    const nextSaturday = today.add(daysUntilNextSaturday, 'day').endOf('day');
 
     return {
-        start: nextSunday.toDate(),
+        start: today.toDate(),
         end: nextSaturday.toDate(),
     };
 }

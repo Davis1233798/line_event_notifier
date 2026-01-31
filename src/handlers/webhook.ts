@@ -22,7 +22,7 @@ import {
     saveGroupInfo,
     setBotJoinedAt,
 } from '../services/firestore.js';
-import { handleTestReminder } from './scheduler.js';
+import { handleTestReminder, handleProductionDateTest } from './scheduler.js';
 import type { ParsedCommand } from '../types/index.js';
 
 /**
@@ -180,6 +180,9 @@ async function handleCommand(
             break;
         case '測試提醒':
             await handleTestReminder(replyToken, groupId);
+            break;
+        case '正式日期測試':
+            await handleProductionDateTest(replyToken, groupId);
             break;
     }
 }

@@ -276,3 +276,95 @@ function formatDateRange(start: Date, end: Date): string {
     };
     return `${formatDate(start)} ~ ${formatDate(end)}`;
 }
+
+/**
+ * 處理正式日期測試指令
+ * 顯示今天到下週六的日期範圍及活動
+ */
+export async function handleProductionDateTest(
+    replyToken: string,
+    groupId: string
+): Promise<void> {
+    try {
+        // 取得最新排程
+        const schedule = await getLatestSchedule(groupId);
+
+        if (!schedule) {
+            await replyMessage(replyToken, createTextMessage(
+                '❌ 尚未設定活動排程\n' +
+                '請先 @ 我並貼上活動訊息'
+            ));
+            return;
+        }
+
+        // 取得正式提醒的日期範圍（今天到下週六）
+        const { start, end } = getNextWeekRange();
+
+        // 取得該時間範圍的活動
+        const events = schedule.events.filter(event => {
+            const eventDate = new Date(event.date);
+            eventDate.setHours(0, 0, 0, 0);
+            const startDate = new Date(start);
+            startDate.setHours(0, 0, 0, 0);
+            const endDate = new Date(end);
+            endDate.setHours(23, 59, 59, 999);
+            return eventDate >= startDate && eventDate <= endDate;
+        });
+
+        // 格式化日期顯示
+        const rangeStr = formatDateRange(start, end);
+        const today = new Date();
+        const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
+        const todayStr = `${today.getMonth() + 1}/${today.getDate()}(${dayNames[today.getDay()]})`;
+
+        if (events.length === 0) {
+            await replyMessage(replyToken, createTextMessage(
+                `📅 【正式日期測試】\n\n` +
+                `📍 今天：${todayStr}\n` +
+                `📍 查詢範圍：${rangeStr}\n\n` +
+                `⚠️ 這個範圍內沒有活動`
+            ));
+            return;
+        }
+
+        // 收集所有志工名稱
+        const allVolunteers = new Set<string>();
+        for (const event of events) {
+            event.volunteers.forEach(v => allVolunteers.add(v));
+        }
+
+        // 取得綁定資訊
+        const bindings = await getBindingsForNames(groupId, Array.from(allVolunteers));
+
+        // 建立 displayName -> LINE 名稱 的對照
+        const volunteerNames = new Map<string, string>();
+        for (const [displayName, binding] of bindings) {
+            volunteerNames.set(displayName, binding.userName);
+        }
+
+        // 格式化提醒訊息
+        const eventsWithNames = events.map(event => ({
+            date: event.date,
+            type: event.type,
+            volunteers: event.volunteers,
+            volunteerNames,
+        }));
+
+        const reminderText = formatReminderMessage(eventsWithNames);
+
+        // 組合測試結果
+        const testMessage =
+            `📅 【正式日期測試】\n\n` +
+            `📍 今天：${todayStr}\n` +
+            `📍 查詢範圍：${rangeStr}\n` +
+            `📍 活動數量：${events.length} 場\n\n` +
+            `${reminderText}`;
+
+        await replyMessage(replyToken, createTextMessage(testMessage));
+    } catch (error) {
+        console.error('Error in production date test:', error);
+        await replyMessage(replyToken, createTextMessage(
+            '❌ 正式日期測試失敗\n錯誤：' + String(error)
+        ));
+    }
+}

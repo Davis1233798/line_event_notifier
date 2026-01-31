@@ -51,7 +51,7 @@ export interface GroupInfo {
 // ============ 指令相關 ============
 
 /** 支援的指令類型 */
-export type CommandType = '綁定' | '解綁' | '查詢' | '列表' | '幫助' | '測試提醒';
+export type CommandType = '綁定' | '解綁' | '查詢' | '列表' | '幫助' | '測試提醒' | '正式日期測試';
 
 /** 解析後的指令 */
 export interface ParsedCommand {
