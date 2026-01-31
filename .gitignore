@@ -27,3 +27,4 @@ npm-debug.log*
 
 # Test coverage
 coverage/
+github-actions-key.json
