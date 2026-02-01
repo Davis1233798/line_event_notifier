@@ -68,8 +68,10 @@ GitHub 就像是程式碼的圖書館，我們要先把機器人的程式碼放�
 
 ---
 
-## 4. 第三關：申請 Google Cloud (GCP)
-我們要租 Google 的電腦來讓機器人從早到晚運作。
+## 4. 第三關：申請 Google Cloud 與 Firebase
+我們要租 Google 的電腦來讓機器人從早到晚運作，還要幫機器人準備一本筆記本 (Firebase)。
+
+### 4-1. 設定 Google Cloud
 
 1.  **註冊 GCP**：
     *   去 [Google Cloud Console](https://console.cloud.google.com/)。
@@ -81,71 +83,166 @@ GitHub 就像是程式碼的圖書館，我們要先把機器人的程式碼放�
     *   記下你的 **Project ID** (專案 ID)，等等會用到。
 
 3.  **開啟必要功能 (API)**：
-    *   在搜尋列輸入並啟用以下四個功能：
-        1.  **Cloud Run** (機器人住的地方)
-        2.  **Cloud Build** (幫忙蓋房子)
-        3.  **Cloud Scheduler** (定時鬧鐘)
-        4.  **Firestore** (機器人的筆記本)
+    *   在搜尋列輸入並啟用以下三個功能：
+        1.  **Cloud Run API** (機器人住的地方)
+        2.  **Cloud Build API** (幫忙蓋房子)
+        3.  **Cloud Scheduler API** (定時鬧鐘)
 
-4.  **設定 Firestore (筆記本)**：
-    *   搜尋 "Firestore"，選擇 "Create Database"。
-    *   模式選 "Native mode"。
-    *   Location (地點) 選 `asia-east1` (台灣) 或 `asia-northeast1` (東京)。
+### 4-2. 設定 Firebase (機器人的筆記本)
+
+Firebase 是 Google 提供的資料庫服務，機器人會用它來記住活動和綁定資料。
+
+1.  **進入 Firebase Console**：
+    *   去 [Firebase Console](https://console.firebase.google.com/)。
+    *   用同一個 Google 帳號登入。
+
+2.  **新增專案 (連結 GCP 專案)**：
+    *   點 "新增專案" 或 "Add project"。
+    *   **重要！** 在專案名稱欄位，選擇你剛剛在 GCP 建立的專案 (例如 `line-notifier`)。
+    *   這樣 Firebase 就會跟 GCP 共用同一個專案。
+    *   Google Analytics 可以選「不啟用」，然後點 "Create project"。
+
+3.  **建立 Firestore 資料庫**：
+    *   在 Firebase 左邊選單，點 **"Build"** → **"Firestore Database"**。
+    *   點 **"Create database"**。
+    *   選 **"Start in production mode"** (正式模式)。
+    *   Location 選 **`asia-east1` (台灣)** 或 `asia-northeast1` (東京)。
+    *   點 "Enable"，等它建立完成。
+
+4.  **設定安全規則 (讓機器人可以讀寫)**：
+    *   在 Firestore Database 頁面，點上方的 **"Rules"** 頁籤。
+    *   把規則改成這樣 (允許伺服器端存取)：
+    
+    ```
+    rules_version = '2';
+    service cloud.firestore {
+      match /databases/{database}/documents {
+        match /{document=**} {
+          allow read, write: if false;
+        }
+      }
+    }
+    ```
+    
+    *   點 "Publish"。
+    *   **說明**：這個規則禁止網頁直接存取，但我們的機器人是用「服務帳號」存取的，所以不受這個規則影響，這樣比較安全！
 
 ---
 
 ## 5. 第四關：啟動機器人！
-這一步稍微難一點點，但我們可以用最簡單的方法：**Google Cloud Shell** (雲端黑框框)。
+這一步我們會用 **GitHub Actions** 自動幫你部署，你只需要在網頁上點點點就好！
 
-1.  **打開 Cloud Shell**：
-    *   在 GCP 網頁右上角，點一個像「終端機」的圖示 (>_)。
-    *   下面會跳出一個黑色視窗。
+### 步驟 A：把程式碼放到 GitHub
 
-2.  **把程式碼放上去**：
-    *   在 Cloud Shell 視窗點 "Open Editor" (或是點三個點 -> Upload)。
-    *   把你第一關下載的程式碼整包上傳上去。 (或者如果你會用 git，直接 `git clone` 你的專案)。
+1.  **建立新 Repository**：
+    *   登入 [GitHub](https://github.com/)，點右上角的 "+" 選 "New repository"。
+    *   Repository name 取名為 `line-notifier`。
+    *   選 **Private** (私人)。
+    *   點 "Create repository"。
 
-3.  **設定環境變數 (告訴機器人鑰匙在哪)**：
-    *   在黑色視窗輸入以下指令 (要把 `xxx` 換成你剛剛拿到的資料)：
-    
-    ```bash
-    # 設定你的專案 ID
-    gcloud config set project [你的Project_ID]
+2.  **上傳程式碼**：
+    *   在新建的 repository 頁面，點 "uploading an existing file"。
+    *   把你下載的程式碼資料夾裡的**所有檔案**拖進去。
+    *   點 "Commit changes"。
 
-    # 設定機器人的鑰匙 (全部貼在同一行執行)
-    gcloud run deploy line-notifier \
-      --source . \
-      --platform managed \
-      --region asia-east1 \
-      --allow-unauthenticated \
-      --set-env-vars "LINE_CHANNEL_ACCESS_TOKEN=你的長長鑰匙(Token),LINE_CHANNEL_SECRET=你的短短鑰匙(Secret),GCP_PROJECT_ID=你的Project_ID"
-    ```
+### 步驟 B：設定 GCP 服務帳號 (給 GitHub 權限去 GCP 部署)
 
-4.  **等待部署**：
-    *   按 Enter 執行。如果問你要不要啟用 API，選 `y`。
-    *   等它跑完，最後會出現一個 **Service URL** (網址)，把它複製起來！
+1.  **建立服務帳號**：
+    *   在 GCP Console 搜尋 **"IAM & Admin"**，選 **"Service Accounts"**。
+    *   點 "+ CREATE SERVICE ACCOUNT"。
+    *   Service account name 取名 `github-actions`。
+    *   點 "CREATE AND CONTINUE"。
 
-5.  **設定 Webhook (接電話)**：
-    *   回到 **LINE Developers** 的 **Messaging API** 頁籤。
+2.  **給權限**：
+    *   在 "Grant this service account access to project" 頁面，加入以下角色：
+        *   `Cloud Run Admin`
+        *   `Cloud Build Editor`
+        *   `Storage Admin`
+        *   `Service Account User`
+    *   點 "CONTINUE" 然後 "DONE"。
+
+3.  **產生金鑰 (JSON 檔案)**：
+    *   在服務帳號列表中，點剛剛建立的 `github-actions` 帳號。
+    *   點 "KEYS" 頁籤 → "ADD KEY" → "Create new key"。
+    *   選 **JSON**，點 "CREATE"。
+    *   會自動下載一個 `.json` 檔案，**這個很重要，保存好！**
+
+### 步驟 C：在 GitHub 設定秘密
+
+1.  **進入 GitHub Secrets**：
+    *   在你的 GitHub repository 頁面，點 "Settings" → "Secrets and variables" → "Actions"。
+    *   點 "New repository secret"。
+
+2.  **新增以下 Secrets** (一個一個新增)：
+
+    | Name | Value (值) |
+    |------|------------|
+    | `GCP_PROJECT_ID` | 你的 GCP 專案 ID |
+    | `GCP_SA_KEY` | 把剛剛下載的 JSON 檔案**整個內容**複製貼上 |
+    | `LINE_CHANNEL_ACCESS_TOKEN` | 你的 LINE Channel Access Token (長長的那個) |
+    | `LINE_CHANNEL_SECRET` | 你的 LINE Channel Secret (短短的那個) |
+
+### 步驟 D：部署 Cloud Run (用網頁操作)
+
+1.  **進入 Cloud Run**：
+    *   在 GCP Console 搜尋 **"Cloud Run"**，點進去。
+    *   點 "+ CREATE SERVICE"。
+
+2.  **設定服務來源**：
+    *   選 "Continuously deploy from a repository (source or function)"。
+    *   點 "SET UP WITH CLOUD BUILD"。
+    *   連結你的 GitHub 帳號，選擇 `line-notifier` repository。
+    *   Branch 選 `main` 或 `master`。
+    *   Build Type 選 **Dockerfile**。
+    *   點 "SAVE"。
+
+3.  **設定服務**：
+    *   Service name：`line-notifier`
+    *   Region：`asia-east1` (台灣)
+    *   Authentication：選 **"Allow unauthenticated invocations"** (允許任何人存取)
+
+4.  **設定環境變數**：
+    *   展開 "Container, Networking, Security"。
+    *   點 "VARIABLES & SECRETS" 頁籤。
+    *   點 "+ ADD VARIABLE"，加入：
+        *   Name: `LINE_CHANNEL_ACCESS_TOKEN`，Value: 你的長長鑰匙
+        *   Name: `LINE_CHANNEL_SECRET`，Value: 你的短短鑰匙
+        *   Name: `GCP_PROJECT_ID`，Value: 你的專案 ID
+
+5.  **建立服務**：
+    *   點最下面的 "CREATE"。
+    *   等待部署完成 (約 2-5 分鐘)。
+    *   完成後會看到一個 **Service URL**，複製下來！
+
+### 步驟 E：設定 LINE Webhook
+
+1.  **回到 LINE Developers**：
+    *   進入你的 Channel 的 **Messaging API** 頁籤。
     *   找到 **"Webhook URL"**，按 Edit。
-    *   貼上剛剛的 Service URL。
-    *   **重要：** 網址後面要記得加上 `/webhook`。
-        *   例如：`https://你的網址.../webhook`
-    *   按下 "Verify"，如果出現 Success 就是成功了！
-    *   打開 "Use webhook" 的開關。
+    *   貼上 Cloud Run 的 Service URL，**後面加上** `/webhook`。
+        *   例如：`https://line-notifier-xxxxx.run.app/webhook`
+    *   按 "Verify"，看到 Success 就成功了！
+    *   打開 **"Use webhook"** 開關。
 
-6.  **設定每週鬧鐘 (Cloud Scheduler)**：
-    *   回到 Cloud Shell，執行這個指令 (把 URL 換成你的 Service URL)：
-    
-    ```bash
-    gcloud scheduler jobs create http line-notifier-weekly \
-      --schedule="0 9 * * 6" \
-      --time-zone="Asia/Taipei" \
-      --uri="[你的Service_URL]/trigger-reminder" \
-      --http-method=POST \
-      --location=asia-east1
-    ```
-    *   這樣每週六早上 9 點就會觸發提醒了！
+### 步驟 F：設定每週提醒 (Cloud Scheduler)
+
+1.  **進入 Cloud Scheduler**：
+    *   在 GCP Console 搜尋 **"Cloud Scheduler"**，點進去。
+    *   點 "+ CREATE JOB"。
+
+2.  **設定排程**：
+    *   Name：`line-notifier-weekly`
+    *   Region：`asia-east1`
+    *   Frequency：`0 9 * * 6` (代表每週六早上 9 點)
+    *   Timezone：`Asia/Taipei`
+
+3.  **設定目標**：
+    *   Target type：**HTTP**
+    *   URL：你的 Service URL + `/trigger-reminder`
+        *   例如：`https://line-notifier-xxxxx.run.app/trigger-reminder`
+    *   HTTP method：**POST**
+
+4.  點 "CREATE"，完成！
 
 ---
 
