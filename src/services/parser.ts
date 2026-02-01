@@ -168,6 +168,8 @@ export function parseCommand(message: string): ParsedCommand | null {
         '測試提醒': '測試提醒',
         'test': '測試提醒',
         '正式日期測試': '正式日期測試',
+        '用量': '用量',
+        'quota': '用量',
     };
 
     let commandType = commandMap[parts[0]];

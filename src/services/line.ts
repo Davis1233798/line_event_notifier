@@ -175,3 +175,31 @@ function formatDateForMessage(date: Date): string {
     const dayOfWeek = dayNames[date.getDay()];
     return `${month}/${day}(${dayOfWeek})`;
 }
+
+/**
+ * 取得訊息用量資訊
+ */
+export async function getQuotaInfo(): Promise<{
+    quota: number;
+    used: number;
+    remaining: number;
+}> {
+    const token = config.lineChannelAccessToken;
+    const headers = {
+        'Authorization': `Bearer ${token}`,
+    };
+
+    const [quotaRes, consumptionRes] = await Promise.all([
+        fetch('https://api.line.me/v2/bot/message/quota', { headers }),
+        fetch('https://api.line.me/v2/bot/message/quota/consumption', { headers }),
+    ]);
+
+    const quotaData = await quotaRes.json() as { value?: number };
+    const consumptionData = await consumptionRes.json() as { totalUsage?: number };
+
+    const quota = quotaData.value ?? 0;
+    const used = consumptionData.totalUsage ?? 0;
+    const remaining = Math.max(0, quota - used);
+
+    return { quota, used, remaining };
+}

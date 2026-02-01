@@ -7,6 +7,7 @@ import {
     getGroupId,
     getUserId,
     getGroupMemberProfile,
+    getQuotaInfo,
 } from '../services/line.js';
 import {
     parseScheduleMessage,
@@ -35,22 +36,45 @@ export async function handleWebhookEvent(event: WebhookEvent): Promise<void> {
         return;
     }
 
-    // 只處理群組的文字訊息
+    // 只處理文字訊息
     if (event.type !== 'message' || event.message.type !== 'text') {
         return;
     }
 
-    if (event.source.type !== 'group') {
-        // 非群組訊息，可以回覆說明
+    const message = event.message.text;
+    const command = parseCommand(message);
+
+    // 私訊處理：支援部分指令
+    if (event.source.type === 'user') {
+        if (command) {
+            // 私訊支援的指令：幫助、用量
+            if (command.type === '幫助') {
+                await showHelp(event.replyToken);
+                return;
+            }
+            if (command.type === '用量') {
+                await handleQuotaCommand(event.replyToken);
+                return;
+            }
+        }
+        // 其他私訊回覆說明
         await replyMessage(event.replyToken, createTextMessage(
-            '⚠️ 此機器人僅支援群組使用\n請將我加入群組後使用！'
+            '👋 您好！我是活動提醒機器人\n\n' +
+            '📌 私訊可用指令：\n' +
+            '• !幫助 - 查看說明\n' +
+            '• !用量 - 查看本月訊息用量\n\n' +
+            '💡 其他功能請在群組中使用'
         ));
+        return;
+    }
+
+    // 非群組也非私訊（如房間），忽略
+    if (event.source.type !== 'group') {
         return;
     }
 
     const groupId = event.source.groupId;
     const userId = event.source.userId;
-    const message = event.message.text;
 
     // 更新群組活動時間（非關鍵，錯誤不阻斷流程）
     try {
@@ -59,8 +83,7 @@ export async function handleWebhookEvent(event: WebhookEvent): Promise<void> {
         console.error('Error saving group info:', error);
     }
 
-    // 檢查是否為指令
-    const command = parseCommand(message);
+    // 檢查是否為指令（使用已宣告的 command）
     if (command) {
         console.log(`Command detected: ${command.type} ${command.args.join(' ')}`);
         await handleCommand(event.replyToken, groupId, userId!, command);
@@ -83,6 +106,27 @@ export async function handleWebhookEvent(event: WebhookEvent): Promise<void> {
         }
     }
 
+}
+
+/**
+ * 處理用量查詢指令
+ */
+async function handleQuotaCommand(replyToken: string): Promise<void> {
+    try {
+        const { quota, used, remaining } = await getQuotaInfo();
+
+        await replyMessage(replyToken, createTextMessage(
+            `📊 本月訊息用量\n\n` +
+            `🔹 總額度：${quota} 則\n` +
+            `🔸 已使用：${used} 則\n` +
+            `✅ 剩餘：${remaining} 則`
+        ));
+    } catch (error) {
+        console.error('Error getting quota info:', error);
+        await replyMessage(replyToken, createTextMessage(
+            '❌ 查詢用量失敗，請稍後再試'
+        ));
+    }
 }
 
 /**
@@ -183,6 +227,9 @@ async function handleCommand(
             break;
         case '正式日期測試':
             await handleProductionDateTest(replyToken, groupId);
+            break;
+        case '用量':
+            await handleQuotaCommand(replyToken);
             break;
     }
 }
@@ -345,9 +392,12 @@ async function showHelp(replyToken: string): Promise<void> {
         '!解綁 - 解除自己的綁定\n' +
         '!查詢 - 查詢自己的綁定\n' +
         '!列表 - 列出所有綁定\n' +
-        '!測試提醒 - 測試下週活動提醒\n' +
+        '!測試提醒 - 測試發送提醒（顯示所有活動）\n' +
+        '!正式日期測試 - 測試正式日期範圍\n' +
+        '!用量 - 查詢本月訊息用量\n' +
         '!幫助 - 顯示此說明\n\n' +
-        '🔔 每週六早上自動發送下週活動提醒'
+        '💡 私訊可使用：!幫助、!用量\n' +
+        '🔔 每週六早上 8:00 自動發送提醒'
     ));
 }
 
