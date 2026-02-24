@@ -12,6 +12,7 @@ export function getFirestore(): Firestore {
     if (!firestoreClient) {
         firestoreClient = new Firestore({
             projectId: config.gcpProjectId || undefined,
+            databaseId: 'line-notifier',
         });
     }
     return firestoreClient;
